@@ -1,11 +1,11 @@
 {
   "version": 1,
   "skills": {
-    "laravel-specialist": {
-      "source": "jeffallan/claude-skills",
+    "spatie-laravel-php": {
+      "source": "spatie/guidelines-skills",
       "sourceType": "github",
-      "skillPath": "skills/laravel-specialist/SKILL.md",
-      "computedHash": "d58e2ed3488398cb94a039f25b9d270e55dc434e16102abff9035608bec3db90"
+      "skillPath": "resources/boost/skills/spatie-laravel-php/SKILL.md",
+      "computedHash": "9c93332d7f84626db41dee9bf66534209250d99efd08295c8eac422e3a1af178"
     }
   }
 }
