@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "laravel-boost": {
+            "command": "/usr/bin/php8.3",
+            "args": [
+                "/home/alev/PhpstormProjects/registration_ia_laravel/artisan",
+                "boost:mcp"
+            ]
+        }
+    }
+}
