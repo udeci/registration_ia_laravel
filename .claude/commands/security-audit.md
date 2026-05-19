@@ -82,7 +82,7 @@ snyk test
 Generar:
 
 ```text
-/docs/security-audit.md
+/docs/security-audit-report.md
 ```
 
 Formato:
