@@ -1,0 +1,49 @@
+name: Laravel Security Scan
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+
+      - name: Install dependencies
+        run: composer install --no-interaction
+
+      - name: Run Laravel tests
+        run: php artisan test
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      - name: Run Semgrep
+        run: semgrep --config=auto .
+
+      - name: Install Snyk
+        run: npm install -g snyk
+
+      - name: Authenticate Snyk
+        run: snyk auth ${{ secrets.SNYK_TOKEN }}
+
+      - name: Run Snyk scan
+        run: snyk test
+
+      - name: Run OWASP Dependency Check
+        run: |
+          docker run --rm \
+          -v $PWD:/src \
+          owasp/dependency-check \
+          --scan /src
+
+      - name: Fail on critical vulnerabilities
+        run: echo "Pipeline bloqueado si hay vulnerabilidades críticas"
