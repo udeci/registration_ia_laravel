@@ -1,0 +1,23 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: registration_ia_app
+    ports:
+      - "8080:80"
+    volumes:
+      - ./database:/var/www/html/database
+      - app_storage:/var/www/html/storage/app
+      - app_logs:/var/www/html/storage/logs
+    environment:
+      APP_ENV: production
+      APP_DEBUG: false
+      APP_URL: http://localhost:8080
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /var/www/html/database/database.sqlite
+    restart: unless-stopped
+
+volumes:
+  app_storage:
+  app_logs:
