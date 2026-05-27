@@ -169,7 +169,7 @@ Resumen de todos los Secrets a configurar en **GitHub → Settings → Secrets a
 |---|---|---|
 | `LARAVEL_APP_KEY` | — | No requerido; el pipeline genera la key en cada run |
 | `GEMINI_API_KEY` | `ia_code_review.yml` | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) |
-| `SNYK_TOKEN` | `security.yml` | [app.snyk.io/account](https://app.snyk.io/account) |
+| `NVD_API_KEY` | `security.yml` (opcional) | [nvd.nist.gov/developers/request-an-api-key](https://nvd.nist.gov/developers/request-an-api-key) — acelera OWASP DC de 5 req/30s a 50 req/30s |
 
 ---
 

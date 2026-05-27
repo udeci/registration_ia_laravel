@@ -59,30 +59,29 @@ jobs:
 
       # ==========================================
       # PASO 5: OWASP DEPENDENCY CHECK (SCA)
+      # Usa la Action oficial en lugar de docker run para obtener caché de NVD
+      # y evitar rate limiting (HTTP 429) sin necesitar NVD_API_KEY.
       # ==========================================
       - name: Run OWASP Dependency Check
-        run: |
-          # Creamos una carpeta para los reportes
-          mkdir -p odc-reports
-          # Corremos el contenedor oficial mapeando el directorio actual
-          docker run --rm \
-            -v ${{ github.workspace }}/:/src \
-            -v ${{ github.workspace }}/odc-reports:/report \
-            owasp/dependency-check:latest \
-            --scan /src \
-            --format "HTML" \
-            --format "JSON" \
-            --out /report \
-            --project "registration-ia" \
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'registration-ia'
+          path: '.'
+          format: 'HTML'
+          args: >
+            --nvdApiKey ${{ secrets.NVD_API_KEY }}
+            --enableRetired
             --failOnCVSS 7
-        # --failOnCVSS 7: Bloquea y hace fallar el pipeline si encuentra vulnerabilidades de nivel Alto o Crítico (OWASP)
+            --exclude "**/*.lock"
+        env:
+          JAVA_HOME: /opt/jdk
 
       # ==========================================
-      # PASO 6: GUARDAR EL REPORTE DE OWASP (OPCIONAL)
+      # PASO 6: GUARDAR EL REPORTE DE OWASP
       # ==========================================
       - name: Upload OWASP Report Artifact
-        if: always() # Se ejecuta aunque el paso anterior haya fallado, para que puedas bajarte el HTML con los errores
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: owasp-security-report
-          path: odc-reports/
+          path: ${{ github.workspace }}/reports
