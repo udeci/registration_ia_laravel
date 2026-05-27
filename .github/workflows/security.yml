@@ -66,14 +66,14 @@ jobs:
           mkdir -p odc-reports
           # Corremos el contenedor oficial mapeando el directorio actual
           docker run --rm \
-            -e USER_ID=$(id -u) \
             -v ${{ github.workspace }}/:/src \
             -v ${{ github.workspace }}/odc-reports:/report \
             owasp/dependency-check:latest \
             --scan /src \
-            --format "CLI" \
             --format "HTML" \
+            --format "JSON" \
             --out /report \
+            --project "registration-ia" \
             --failOnCVSS 7
         # --failOnCVSS 7: Bloquea y hace fallar el pipeline si encuentra vulnerabilidades de nivel Alto o Crítico (OWASP)
 
