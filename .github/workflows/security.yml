@@ -41,10 +41,10 @@ jobs:
           php artisan test
 
       # ==========================================
-      # PASO 3: AUDITORÍA NATIVA DE PAQUETES PHP
+      # PASO 3: AUDITORÍA NATIVA DE PAQUETES PHP (OWASP)
       # ==========================================
       - name: Run Composer Audit
-        # Escanea los paquetes del composer.lock contra la base de datos nativa de PHP
+        # Escanea los paquetes del composer.lock contra la base de datos de vulnerabilidades conocidas
         run: composer audit --locked
 
       # ==========================================
@@ -58,10 +58,31 @@ jobs:
         run: semgrep --config=auto . --error
 
       # ==========================================
-      # PASO 5: GOOGLE OSV SCANNER (SCA RÁPIDO SIN TOKENS)
+      # PASO 5: OWASP DEPENDENCY CHECK (SCA)
       # ==========================================
-      - name: Run Open Source Vulnerability Scanner
-        uses: google/osv-scanner-action/scan@v1
+      - name: Run OWASP Dependency Check
+        run: |
+          # Creamos una carpeta para los reportes
+          mkdir -p odc-reports
+          # Corremos el contenedor oficial mapeando el directorio actual
+          docker run --rm \
+            -v ${{ github.workspace }}/:/src \
+            -v ${{ github.workspace }}/odc-reports:/report \
+            owasp/dependency-check:latest \
+            --scan /src \
+            --format "HTML" \
+            --format "JSON" \
+            --out /report \
+            --project "registration-ia" \
+            --failOnCVSS 7
+        # --failOnCVSS 7: Bloquea y hace fallar el pipeline si encuentra vulnerabilidades de nivel Alto o Crítico (OWASP)
+
+      # ==========================================
+      # PASO 6: GUARDAR EL REPORTE DE OWASP (OPCIONAL)
+      # ==========================================
+      - name: Upload OWASP Report Artifact
+        if: always() # Se ejecuta aunque el paso anterior haya fallado, para que puedas bajarte el HTML con los errores
+        uses: actions/upload-artifact@v4
         with:
-          scan-args: --file=composer.lock
-        continue-on-error: true # Muestra los errores en consola pero no traba la demo bruscamente si querés ver el reporte final
+          name: owasp-security-report
+          path: odc-reports/
