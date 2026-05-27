@@ -57,10 +57,13 @@ jobs:
 
       - name: Inform Despliegue en Consola
         # Mostramos en los logs qué rama y qué entorno seleccionó el usuario
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
         run: |
           echo "Iniciando despliegue manual..."
-          echo "Rama seleccionada: ${{ github.ref_name }}"
-          echo "Entorno seleccionado: ${{ github.event.inputs.environment }}"
+          echo "Rama seleccionada: $REF_NAME"
+          echo "Entorno seleccionado: $ENVIRONMENT"
 
       - name: Install Zeabur CLI
         run: curl -s https://zeabur.com/install.sh | bash
