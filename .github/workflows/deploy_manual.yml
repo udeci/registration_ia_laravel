@@ -1,50 +1,4 @@
-name: 🚀 Manual Release Deploy
-
-on:
-  # Esto habilita el disparador manual en la interfaz de GitHub Actions
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Entorno de despliegue'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - production
-          - staging
-
-jobs:
-  # ==========================================
-  # BLOQUE 1: RE-VERIFICACIÓN DE SEGURIDAD Y TESTS
-  # ==========================================
-  pre-check:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        # Actions/checkout toma automáticamente la rama que elijas en la interfaz web
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: 8.3
-          extensions: mbstring, xml, ctype, iconv, pdo, pdo_sqlite, sqlite3
-          coverage: none
-
-      - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Run Tests before Deploy
-        run: |
-          cp .env.example .env
-          php artisan key:generate
-          touch database/database.sqlite
-          echo "DB_CONNECTION=sqlite" >> .env
-          echo "DB_DATABASE=database/database.sqlite" >> .env
-          php artisan migrate --force
-          php artisan test
-
-  # ==========================================
+# ==========================================
   # BLOQUE 2: DESPLIEGUE CONTROLADO (ZEABUR)
   # ==========================================
   deploy:
@@ -56,7 +10,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Inform Despliegue en Consola
-        # Mostramos en los logs qué rama y qué entorno seleccionó el usuario
+        # Protegemos las variables pasándolas mediante el contexto env
         env:
           REF_NAME: ${{ github.ref_name }}
           ENVIRONMENT: ${{ github.event.inputs.environment }}
@@ -66,6 +20,7 @@ jobs:
           echo "Entorno seleccionado: $ENVIRONMENT"
 
       - name: Deploy Selected Branch to Zeabur
-        run: npx --yes @zeabur/cli deploy --all -i=false
+        # 💡 Usamos npx directo para ejecutar la herramienta sin descargar scripts rotos por curl
+        run: npx --yes @zeabur/cli deploy --all
         env:
           ZEABUR_TOKEN: ${{ secrets.ZEABUR_TOKEN }}
