@@ -13,7 +13,23 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Trae todo el historial para que el scanner de secretos pueda auditar commits anteriores
 
+      # ==========================================
+      # PASO 1: ESCANEO DE SEGURIDAD (OWASP - SECRETOS EXPUESTOS)
+      # ==========================================
+      - name: Scan for Exposed Secrets (OWASP Critical)
+        uses: trufflesecurity/trufflehog@main
+        with:
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+        continue-on-error: true # Permite que la clase siga si algún alumno dejó un token viejo, pero deja la alerta
+
+      # ==========================================
+      # PASO 2: CONFIGURACIÓN DEL ENTORNO PHP
+      # ==========================================
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -25,7 +41,11 @@ jobs:
         run: composer install --no-progress --prefer-dist --no-interaction
 
       - name: Prepare Environment File
-        run: cp .env.example .env
+        run: |
+          cp .env.example .env
+          # Forzamos a Laravel a usar SQLite en los tests para no requerir un servidor MySQL externo
+          echo "DB_CONNECTION=sqlite" >> .env
+          echo "DB_DATABASE=database/database.sqlite" >> .env
 
       - name: Generate Application Key
         run: php artisan key:generate --force
@@ -33,6 +53,20 @@ jobs:
       - name: Create SQLite database
         run: touch database/database.sqlite
 
+      # ==========================================
+      # PASO 3: AUDITORÍA DE CÓDIGO LARAVEL (OWASP TOP 10)
+      # ==========================================
+      - name: Run Laravel Enlightn Security Scan
+        run: |
+          # Instalamos Enlightn de forma local para el análisis estático de vulnerabilidades
+          composer require vinkla/enlightn --dev --no-interaction
+          # Ejecutamos el análisis enfocado en el entorno de Integración Continua (CI)
+          php artisan enlightn --ci
+        continue-on-error: true # Recomendado para la demo, así ves el reporte aunque encuentre fallas de OWASP
+
+      # ==========================================
+      # PASO 4: EJECUCIÓN DE PRUEBAS UNITARIAS
+      # ==========================================
       - name: Run Migrations
         run: php artisan migrate --force
 
