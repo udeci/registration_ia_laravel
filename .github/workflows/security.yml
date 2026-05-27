@@ -2,7 +2,9 @@ name: Laravel Security Scan
 
 on:
   push:
+    branches: [ main ]
   pull_request:
+    branches: [ main ]
 
 jobs:
   security:
@@ -12,38 +14,75 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ==========================================
+      # PASO 1: ENTORNO PHP Y DEPENDENCIAS
+      # ==========================================
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: 8.3
+          extensions: mbstring, xml, ctype, iconv, pdo, pdo_sqlite, sqlite3
+          coverage: none
 
       - name: Install dependencies
-        run: composer install --no-interaction
+        run: composer install --no-interaction --prefer-dist
 
+      # ==========================================
+      # PASO 2: TESTS DEL PROYECTO
+      # ==========================================
       - name: Run Laravel tests
-        run: php artisan test
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          touch database/database.sqlite
+          echo "DB_CONNECTION=sqlite" >> .env
+          echo "DB_DATABASE=database/database.sqlite" >> .env
+          php artisan migrate --force
+          php artisan test
 
+      # ==========================================
+      # PASO 3: AUDITORÍA NATIVA DE PAQUETES PHP (OWASP)
+      # ==========================================
+      - name: Run Composer Audit (Reemplazo de Snyk)
+        # Escanea los paquetes del composer.lock contra la base de datos de vulnerabilidades conocidas
+        run: composer audit --locked
+
+      # ==========================================
+      # PASO 4: ANÁLISIS ESTÁTICO DE CÓDIGO (SAST)
+      # ==========================================
       - name: Install Semgrep
         run: pip install semgrep
 
-      - name: Run Semgrep
-        run: semgrep --config=auto .
+      - name: Run Semgrep Scan
+        # El flag --error hace que el pipeline falle automáticamente si encuentra fallas críticas de seguridad
+        run: semgrep --config=auto . --error
 
-      - name: Install Snyk
-        run: npm install -g snyk
-
-      - name: Authenticate Snyk
-        run: snyk auth ${{ secrets.SNYK_TOKEN }}
-
-      - name: Run Snyk scan
-        run: snyk test
-
+      # ==========================================
+      # PASO 5: OWASP DEPENDENCY CHECK (SCA)
+      # ==========================================
       - name: Run OWASP Dependency Check
         run: |
+          # Creamos una carpeta para los reportes
+          mkdir -p odc-reports
+          # Corremos el contenedor oficial mapeando el directorio actual
           docker run --rm \
-          -v $PWD:/src \
-          owasp/dependency-check \
-          --scan /src
+            -e USER_ID=$(id -u) \
+            -v ${{ github.workspace }}/:/src \
+            -v ${{ github.workspace }}/odc-reports:/report \
+            owasp/dependency-check:latest \
+            --scan /src \
+            --format "CLI" \
+            --format "HTML" \
+            --out /report \
+            --failOnCVSS 7
+        # --failOnCVSS 7: Bloquea y hace fallar el pipeline si encuentra vulnerabilidades de nivel Alto o Crítico (OWASP)
 
-      - name: Fail on critical vulnerabilities
-        run: echo "Pipeline bloqueado si hay vulnerabilidades críticas"
+      # ==========================================
+      # PASO 6: GUARDAR EL REPORTE DE OWASP (OPCIONAL)
+      # ==========================================
+      - name: Upload OWASP Report Artifact
+        if: always() # Se ejecuta aunque el paso anterior haya fallado, para que puedas bajarte el HTML con los errores
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-security-report
+          path: odc-reports/
