@@ -44,33 +44,18 @@ pull_request → main
 
 ### Secrets necesarios
 
-| Secret | Descripción | Requerido |
-|---|---|---|
-| `LARAVEL_APP_KEY` | Clave de la aplicación (`base64:...`) | Recomendado (tiene fallback) |
+Este workflow **no requiere Secrets**. La `APP_KEY` se genera automáticamente en cada ejecución con `php artisan key:generate --force`, lo cual es seguro para CI ya que las sesiones no persisten entre runs.
 
-### Dónde obtener la `LARAVEL_APP_KEY`
+### Sobre la `LARAVEL_APP_KEY`
 
-La `APP_KEY` es una clave criptográfica que Laravel usa para cifrar sesiones, cookies y datos sensibles. Se genera localmente con Artisan:
-
-**Paso 1 — Generar la key en tu entorno local:**
+La `APP_KEY` es la clave criptográfica que Laravel usa para cifrar sesiones, cookies y datos. Para el entorno **local** se genera con:
 
 ```bash
 php artisan key:generate --show
 # Output: base64:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=
 ```
 
-> Si el proyecto ya tiene una `APP_KEY` en el `.env` local, copiá ese valor directamente.
-
-**Paso 2 — Agregarla como Secret en GitHub:**
-
-1. Ir al repositorio en GitHub
-2. **Settings → Secrets and variables → Actions**
-3. Clic en **"New repository secret"**
-4. Name: `LARAVEL_APP_KEY`
-5. Value: el string `base64:...` completo
-6. Clic en **"Add secret"**
-
-> Si este Secret está vacío o no existe, el pipeline tiene un fallback que genera una key nueva en cada ejecución. Esto es seguro para tests pero no para producción.
+Ese valor vive en tu `.env` local y no necesita subirse a GitHub para que el pipeline de tests funcione.
 
 ---
 
@@ -182,7 +167,7 @@ Resumen de todos los Secrets a configurar en **GitHub → Settings → Secrets a
 
 | Secret | Usado en | Cómo obtenerlo |
 |---|---|---|
-| `LARAVEL_APP_KEY` | `pipeline.yml` | `php artisan key:generate --show` en tu entorno local |
+| `LARAVEL_APP_KEY` | — | No requerido; el pipeline genera la key en cada run |
 | `GEMINI_API_KEY` | `ia_code_review.yml` | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) |
 | `SNYK_TOKEN` | `security.yml` | [app.snyk.io/account](https://app.snyk.io/account) |
 
