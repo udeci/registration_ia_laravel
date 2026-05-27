@@ -1,10 +1,9 @@
 services:
   - type: web
     name: registration-ia-laravel
-    runtime: php # 👈 En algunas versiones de la API de Render se usa 'runtime' en vez de 'env'
+    env: docker # 👈 Le dice a Render que ignore sus entornos nativos y use tu Dockerfile
     plan: free
-    buildCommand: "composer install --no-dev --optimize-autoloader --no-interaction && npm install && npm run build"
-    startCommand: "heroku-php-apache2 public/"
+    region: oregon # Podés cambiarla por la región que prefieras (oregon, frankfurt, singapore, ohio)
     envVars:
       - key: APP_ENV
         value: production
@@ -12,3 +11,7 @@ services:
         value: "false"
       - key: LOG_CHANNEL
         value: stderr
+      # Render requiere que el contenedor escuche en el puerto que te asigna o mapear el tuyo estático.
+      # Como tu Dockerfile expone el 8080, le avisamos a Render:
+      - key: PORT
+        value: "8080"
