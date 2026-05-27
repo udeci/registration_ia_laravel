@@ -1,7 +1,7 @@
 services:
   - type: web
     name: registration-ia-laravel
-    env: php # 👈 ESTO OBLIGA A RENDER A USAR PHP SÍ O SÍ
+    runtime: php # 👈 En algunas versiones de la API de Render se usa 'runtime' en vez de 'env'
     plan: free
     buildCommand: "composer install --no-dev --optimize-autoloader --no-interaction && npm install && npm run build"
     startCommand: "heroku-php-apache2 public/"
