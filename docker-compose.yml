@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: registration_ia_app
     ports:
-      - "8080:80"
+      - "8080:8080"
     volumes:
       - ./database:/var/www/html/database
       - app_storage:/var/www/html/storage/app

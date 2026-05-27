@@ -22,7 +22,6 @@ fi
 # Create SQLite database file if not exists
 if [ ! -f /var/www/html/database/database.sqlite ]; then
     touch /var/www/html/database/database.sqlite
-    chown www-data:www-data /var/www/html/database/database.sqlite
 fi
 
 # Run migrations
@@ -32,13 +31,6 @@ php artisan migrate --force
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
-
-# Fix storage permissions
-chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
-
-# Create supervisor log directory
-mkdir -p /var/log/supervisor
 
 # Start services via supervisor
 exec supervisord -c /etc/supervisor/conf.d/supervisord.conf

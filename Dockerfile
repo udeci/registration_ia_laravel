@@ -65,11 +65,17 @@ COPY docker/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Permissions
+# Permissions and pre-create runtime directories owned by www-data
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/storage \
-    && chmod -R 755 /var/www/html/bootstrap/cache
+    && chmod -R 755 /var/www/html/bootstrap/cache \
+    && mkdir -p /var/log/supervisor /var/log/nginx \
+    && chown -R www-data:www-data /var/log/supervisor /var/log/nginx \
+    && touch /var/run/nginx.pid /var/run/supervisord.pid \
+    && chown www-data:www-data /var/run/nginx.pid /var/run/supervisord.pid
 
-EXPOSE 80
+USER www-data
+
+EXPOSE 8080
 
 ENTRYPOINT ["/entrypoint.sh"]

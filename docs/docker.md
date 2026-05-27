@@ -39,7 +39,7 @@ APP_DEBUG=false
 docker compose up -d --build
 ```
 
-La aplicación queda disponible en **http://localhost:8080**.
+La aplicación queda disponible en **http://localhost:8080** (el contenedor escucha internamente en el puerto 8080 como usuario `www-data`, sin necesitar privilegios root).
 
 ---
 
