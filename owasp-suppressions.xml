@@ -11,7 +11,7 @@
   <suppress>
     <notes>False positive: rollup is not installed. Vite 8 uses rolldown instead.</notes>
     <packageUrl regex="true">^pkg:npm/rollup@.*$</packageUrl>
-    <ghsaId>GHSA-mw96-cpmx-2vgc</ghsaId>
+    <vulnerabilityName>GHSA-mw96-cpmx-2vgc</vulnerabilityName>
   </suppress>
 
   <!--
@@ -23,7 +23,7 @@
   <suppress until="2027-01-01Z">
     <notes>picomatch 4.0.4 is installed (see package-lock.json). OWASP DC reads lower bound of ^4.0.3 range.</notes>
     <packageUrl regex="true">^pkg:npm/picomatch@4\.0\.[0-3]$</packageUrl>
-    <ghsaId>GHSA-c2c7-rcm5-vvqj</ghsaId>
+    <vulnerabilityName>GHSA-c2c7-rcm5-vvqj</vulnerabilityName>
   </suppress>
 
 </suppressions>
