@@ -72,7 +72,7 @@ jobs:
             --nvdApiKey ${{ secrets.NVD_API_KEY }}
             --enableRetired
             --failOnCVSS 7
-            --exclude "**/*.lock"
+            --suppression owasp-suppressions.xml
         env:
           JAVA_HOME: /opt/jdk
 

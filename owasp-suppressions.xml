@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
+  <!--
+    Rollup is NOT a dependency of this project.
+    Vite 8 replaced rollup with rolldown (Rust-based bundler).
+    OWASP DC finds rollup through transitive scanning of dev tooling
+    package.json files, but rollup is never installed or executed.
+    GHSA-mw96-cpmx-2vgc (CVSS 10.0) does not apply.
+  -->
+  <suppress>
+    <notes>False positive: rollup is not installed. Vite 8 uses rolldown instead.</notes>
+    <packageUrl regex="true">^pkg:npm/rollup@.*$</packageUrl>
+    <ghsaId>GHSA-mw96-cpmx-2vgc</ghsaId>
+  </suppress>
+
+  <!--
+    picomatch 4.0.4 is installed (patched version for GHSA-c2c7-rcm5-vvqj).
+    OWASP DC may report 4.0.3 due to reading version ranges from nested
+    package.json files instead of the locked version in package-lock.json.
+    Verified: package-lock.json locks picomatch@4.0.4.
+  -->
+  <suppress until="2027-01-01Z">
+    <notes>picomatch 4.0.4 is installed (see package-lock.json). OWASP DC reads lower bound of ^4.0.3 range.</notes>
+    <packageUrl regex="true">^pkg:npm/picomatch@4\.0\.[0-3]$</packageUrl>
+    <ghsaId>GHSA-c2c7-rcm5-vvqj</ghsaId>
+  </suppress>
+
+</suppressions>
