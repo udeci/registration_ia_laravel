@@ -65,13 +65,7 @@ jobs:
           echo "Rama seleccionada: $REF_NAME"
           echo "Entorno seleccionado: $ENVIRONMENT"
 
-      - name: Install Zeabur CLI
-        run: curl -s https://zeabur.com/install.sh | bash
-
       - name: Deploy Selected Branch to Zeabur
-        run: |
-          export PATH="$HOME/.zeabur/bin:$PATH"
-          # El CLI de Zeabur tomará el código de la rama actual que bajó el checkout
-          zeabur deploy --all
+        run: npx --yes @zeabur/cli deploy --all -i=false
         env:
           ZEABUR_TOKEN: ${{ secrets.ZEABUR_TOKEN }}
