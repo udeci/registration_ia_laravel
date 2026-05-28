@@ -1,0 +1,236 @@
+# ============================================================
+# GitLab CI/CD — Registration IA Laravel
+#
+# Equivalente a los workflows de GitHub Actions:
+#   pipeline.yml | security.yml | ia_code_review.yml | deploy_manual.yml
+#
+# Variables requeridas en GitLab → Settings → CI/CD → Variables:
+#   GEMINI_API_KEY   — AI code review
+#   NVD_API_KEY      — OWASP Dependency Check
+#   RENDER_DEPLOY_HOOK_URL — URL del deploy hook de Render
+# ============================================================
+
+stages:
+  - test
+  - security
+  - ai-review
+  - deploy
+
+variables:
+  COMPOSER_CACHE_DIR: "$CI_PROJECT_DIR/.composer-cache"
+  DEPLOY_ENVIRONMENT: "production"   # Sobreescribir al lanzar pipeline manual
+
+# ─────────────────────────────────────────────────────────────
+# TEMPLATE: Configuración base de PHP 8.3
+# ─────────────────────────────────────────────────────────────
+.php-setup: &php-setup
+  image: php:8.3-cli-alpine
+  before_script:
+    - apk add --no-cache git curl unzip sqlite sqlite-dev libzip-dev oniguruma-dev icu-dev bcmath-dev
+    - docker-php-ext-install pdo pdo_sqlite mbstring zip bcmath intl
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+  cache:
+    key: "composer-$CI_COMMIT_REF_SLUG"
+    paths:
+      - .composer-cache/
+      - vendor/
+
+# ─────────────────────────────────────────────────────────────
+# STAGE 1: TEST — CI Pipeline
+# Equivalente a: pipeline.yml
+# ─────────────────────────────────────────────────────────────
+laravel-tests:
+  <<: *php-setup
+  stage: test
+
+  script:
+    # --- Escaneo de secretos expuestos (equivalente a TruffleHog Action) ---
+    - |
+      curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh \
+        | sh -s -- -b /usr/local/bin
+      trufflehog git file:///. --only-verified || true
+
+    # --- Dependencias PHP ---
+    - composer install --no-progress --prefer-dist --no-interaction
+
+    # --- Entorno ---
+    - cp .env.example .env
+    - echo "DB_CONNECTION=sqlite" >> .env
+    - echo "DB_DATABASE=database/database.sqlite" >> .env
+    - php artisan key:generate --force
+    - touch database/database.sqlite
+
+    # --- Enlightn OWASP Top 10 scan (allow_failure) ---
+    - composer require vinkla/enlightn --dev --no-interaction || true
+    - php artisan enlightn --ci || true
+
+    # --- Migraciones y tests ---
+    - php artisan migrate --force
+    - php artisan test --compact
+
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# ─────────────────────────────────────────────────────────────
+# STAGE 2: SECURITY — Escaneo de seguridad
+# Equivalente a: security.yml
+# ─────────────────────────────────────────────────────────────
+composer-audit:
+  <<: *php-setup
+  stage: security
+
+  script:
+    - composer install --no-interaction --prefer-dist
+    - composer audit --locked
+
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+semgrep:
+  stage: security
+  image: python:3.10-slim
+
+  script:
+    - pip install semgrep
+    - semgrep --config=auto . --error
+
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+owasp-dependency-check:
+  stage: security
+  image:
+    name: owasp/dependency-check:latest
+    entrypoint: [""]    # Necesario para usar el binario manualmente desde script:
+
+  script:
+    - mkdir -p odc-reports .owasp-dc-cache
+    - >
+      /usr/share/dependency-check/bin/dependency-check.sh
+      --scan "$CI_PROJECT_DIR"
+      --format "HTML"
+      --format "JSON"
+      --out "$CI_PROJECT_DIR/odc-reports"
+      --project "registration-ia"
+      --nvdApiKey "$NVD_API_KEY"
+      --data "$CI_PROJECT_DIR/.owasp-dc-cache"
+      --enableRetired
+      --failOnCVSS 7
+      --suppression "$CI_PROJECT_DIR/owasp-suppressions.xml"
+
+  cache:
+    key: "owasp-nvd-db"
+    paths:
+      - .owasp-dc-cache/
+
+  artifacts:
+    when: always
+    name: "owasp-report-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - odc-reports/
+    expire_in: 7 days
+
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# ─────────────────────────────────────────────────────────────
+# STAGE 3: AI REVIEW — Code Review con Gemini
+# Equivalente a: ia_code_review.yml
+# ─────────────────────────────────────────────────────────────
+ai-code-review:
+  stage: ai-review
+  image: python:3.10-slim
+
+  script:
+    - pip install google-generativeai
+    - git diff HEAD~1 HEAD -- '*.php' > laravel_changes.diff || true
+    - |
+      python3 - <<'PYEOF'
+      import os
+      import google.generativeai as genai
+
+      genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+
+      if not os.path.exists("laravel_changes.diff") or os.path.getsize("laravel_changes.diff") == 0:
+          print("No se detectaron cambios en archivos PHP para auditar.")
+          exit(0)
+
+      with open("laravel_changes.diff", "r") as f:
+          diff_content = f.read()
+
+      prompt = f"""
+      Actuá como un Auditor de Seguridad Senior experto en Laravel.
+      Analizá el siguiente diff de código PHP e identificá de forma concisa:
+      1. Vulnerabilidades (SQL Injection, XSS, Mass Assignment, falta de Middlewares).
+      2. Malas prácticas de arquitectura (Lógica de negocio en controladores en vez de Services/Models).
+      3. Nivel de Riesgo (Bajo / Medio / Alto).
+
+      Diff de código:
+      {diff_content}
+      """
+
+      model = genai.GenerativeModel("gemini-2.0-flash")
+      response = model.generate_content(prompt)
+
+      print("\n" + "="*40)
+      print("REPORTE DE AUDITORIA IA - LARAVEL")
+      print("="*40)
+      print(response.text)
+      PYEOF
+
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# ─────────────────────────────────────────────────────────────
+# STAGE 4: DEPLOY — Despliegue manual en Render
+# Equivalente a: deploy_manual.yml
+#
+# Cómo usarlo:
+#   GitLab → CI/CD → Pipelines → Run pipeline
+#   Agregar variable: DEPLOY_ENVIRONMENT = production | staging
+# ─────────────────────────────────────────────────────────────
+pre-deploy-tests:
+  <<: *php-setup
+  stage: deploy
+  when: manual
+
+  script:
+    - composer install --no-interaction --prefer-dist
+    - cp .env.example .env
+    - php artisan key:generate --force
+    - touch database/database.sqlite
+    - echo "DB_CONNECTION=sqlite" >> .env
+    - echo "DB_DATABASE=database/database.sqlite" >> .env
+    - php artisan migrate --force
+    - php artisan test --compact
+
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+
+deploy-render:
+  stage: deploy
+  image: alpine:latest
+  needs: ["pre-deploy-tests"]
+
+  before_script:
+    - apk add --no-cache curl
+
+  script:
+    - echo "Iniciando despliegue manual..."
+    - echo "Rama seleccionada para Render: $CI_COMMIT_REF_NAME"
+    - echo "Entorno seleccionado: $DEPLOY_ENVIRONMENT"
+    - curl -fX POST "${RENDER_DEPLOY_HOOK_URL}&ref=${CI_COMMIT_REF_NAME}"
+
+  environment:
+    name: $DEPLOY_ENVIRONMENT
+
+  when: manual
+
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
