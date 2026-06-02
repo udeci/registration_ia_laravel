@@ -96,4 +96,55 @@ class ProfileTest extends TestCase
 
         $this->assertNotNull($user->fresh());
     }
+
+    public function test_unauthenticated_users_cannot_access_profile(): void
+    {
+        $response = $this->get('/profile');
+
+        $response->assertRedirect('/login');
+    }
+
+    public function test_profile_update_requires_a_name(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => '',
+                'email' => $user->email,
+            ]);
+
+        $response->assertSessionHasErrors('name');
+    }
+
+    public function test_profile_update_requires_a_valid_email(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => 'not-an-email',
+            ]);
+
+        $response->assertSessionHasErrors('email');
+    }
+
+    public function test_profile_update_fails_when_email_is_taken_by_another_user(): void
+    {
+        $existingUser = User::factory()->create(['email' => 'taken@example.com']);
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => 'taken@example.com',
+            ]);
+
+        $response->assertSessionHasErrors('email');
+        $this->assertNotSame('taken@example.com', $user->fresh()->email);
+    }
 }

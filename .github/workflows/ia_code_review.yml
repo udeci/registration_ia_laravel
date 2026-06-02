@@ -1,0 +1,64 @@
+name: Code Reviewer
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # Trae los últimos dos commits para poder calcular el diff
+
+      - name: Get Code Diff
+        run: |
+          # Filtramos para que solo analice archivos de código de Laravel (.php)
+          git diff HEAD~1 HEAD -- '*.php' > laravel_changes.diff || true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Google Generative AI SDK
+        run: pip install google-generativeai
+
+      - name: Run AI Audit
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python - <<EOF
+          import os
+          import google.generativeai as genai
+
+          genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+
+          if not os.path.exists("laravel_changes.diff") or os.path.getsize("laravel_changes.diff") == 0:
+              print("No se detectaron cambios en archivos PHP para auditar.")
+              exit(0)
+
+          with open("laravel_changes.diff", "r") as f:
+              diff_content = f.read()
+
+          prompt = f"""
+          Actuá como un Auditor de Seguridad Senior experto en Laravel.
+          Analizá el siguiente diff de código PHP e identificá de forma concisa:
+          1. Vulnerabilidades (SQL Injection, XSS, Mass Assignment, falta de Middlewares).
+          2. Malas prácticas de arquitectura (Lógica de negocio en controladores en vez de Services/Models).
+          3. Nivel de Riesgo (Bajo / Medio / Alto).
+
+          Diff de código:
+          {diff_content}
+          """
+
+          model = genai.GenerativeModel("gemini-2.0-flash")
+          response = model.generate_content(prompt)
+
+          print("\n" + "="*40)
+          print("REPORTE DE AUDITORIA IA - LARAVEL")
+          print("="*40)
+          print(response.text)
+          EOF
